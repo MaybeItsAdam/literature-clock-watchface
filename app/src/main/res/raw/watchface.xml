@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Literature Clock — Watch Face Format (WFF v1)
+
+  Architecture:
+  - A full-screen LONG_TEXT ComplicationSlot displays the literary quote.
+  - The LiteratureQuoteDataSource service provides quote text + attribution.
+  - UserConfigurations allow dark-mode toggle and font style switching.
+  - Ambient mode dims text and uses a black background for OLED savings.
+-->
+<WatchFace width="450" height="450">
+
+    <Metadata key="CLOCK_TYPE" value="DIGITAL" />
+    <Metadata key="PREVIEW_TIME" value="10:08:00" />
+
+    <!-- ============================================================
+         USER CONFIGURATIONS
+         ============================================================ -->
+    <UserConfigurations>
+        <BooleanConfiguration
+            id="dark_mode"
+            displayName="@string/config_dark_mode"
+            defaultValue="FALSE"
+            screenReaderText="@string/config_dark_mode_desc"
+            icon="@drawable/ic_dark_mode" />
+    </UserConfigurations>
+
+    <!-- ============================================================
+         SCENE — INTERACTIVE MODE
+         ============================================================ -->
+    <Scene backgroundColor="#FFF2F0E6">
+
+        <!-- Dark-mode overlay: covers the light background when enabled -->
+        <Group>
+            <Condition>
+                <Expressions>
+                    <Expression name="isDark">[CONFIGURATION.dark_mode]</Expression>
+                </Expressions>
+                <Compare expression="isDark">
+                    <BooleanEquals value="TRUE">
+                        <PartDraw x="0" y="0" width="450" height="450">
+                            <Arc
+                                centerX="225"
+                                centerY="225"
+                                width="450"
+                                height="450"
+                                startAngle="0"
+                                endAngle="360"
+                                direction="CLOCKWISE">
+                                <Stroke cap="ROUND" color="#FF000000" thickness="0" />
+                                <Fill color="#FF000000" />
+                            </Arc>
+                        </PartDraw>
+                    </BooleanEquals>
+                </Compare>
+            </Condition>
+        </Group>
+
+        <!-- ========================================================
+             COMPLICATION SLOT — Full-screen literary quote
+             ======================================================== -->
+        <ComplicationSlot
+            slotId="0"
+            x="40" y="60"
+            width="370" height="330"
+            supportedTypes="LONG_TEXT"
+            isCustomizable="FALSE">
+
+            <DefaultProviderPolicy
+                primaryProvider="uk.co.maybeitsadam.literatureclock/uk.co.maybeitsadam.literatureclock.LiteratureQuoteDataSource"
+                primaryProviderType="LONG_TEXT"
+                defaultSystemProvider="EMPTY"
+                defaultSystemProviderType="LONG_TEXT" />
+
+            <BoundingOval x="0" y="0" width="370" height="330" />
+
+            <!-- Render template for LONG_TEXT complication data -->
+            <Complication type="LONG_TEXT">
+
+                <!-- Quote body (light mode) -->
+                <Group>
+                    <Condition>
+                        <Expressions>
+                            <Expression name="isDark">[CONFIGURATION.dark_mode]</Expression>
+                        </Expressions>
+                        <Compare expression="isDark">
+                            <!-- LIGHT MODE text -->
+                            <BooleanEquals value="FALSE">
+                                <PartText x="0" y="0" width="370" height="270">
+                                    <Text alignment="CENTER">
+                                        <Font size="16" color="#FF333333" family="serif">
+                                            [COMPLICATION.TEXT]
+                                        </Font>
+                                    </Text>
+                                </PartText>
+                                <PartText x="0" y="275" width="370" height="55">
+                                    <Text alignment="CENTER">
+                                        <Font size="13" color="#FF888888" family="serif" slant="ITALIC">
+                                            [COMPLICATION.TITLE]
+                                        </Font>
+                                    </Text>
+                                </PartText>
+                            </BooleanEquals>
+                            <!-- DARK MODE text -->
+                            <BooleanEquals value="TRUE">
+                                <PartText x="0" y="0" width="370" height="270">
+                                    <Text alignment="CENTER">
+                                        <Font size="16" color="#FFDDDDDD" family="serif">
+                                            [COMPLICATION.TEXT]
+                                        </Font>
+                                    </Text>
+                                </PartText>
+                                <PartText x="0" y="275" width="370" height="55">
+                                    <Text alignment="CENTER">
+                                        <Font size="13" color="#FF777777" family="serif" slant="ITALIC">
+                                            [COMPLICATION.TITLE]
+                                        </Font>
+                                    </Text>
+                                </PartText>
+                            </BooleanEquals>
+                        </Compare>
+                    </Condition>
+                </Group>
+
+            </Complication>
+
+        </ComplicationSlot>
+
+    </Scene>
+
+    <!-- ============================================================
+         AMBIENT MODE (Always-On Display)
+         Power-saving: black background, dimmed thin text, no AA.
+         ============================================================ -->
+    <Scene backgroundColor="#FF000000">
+        <Variant mode="AMBIENT" />
+
+        <ComplicationSlot
+            slotId="0"
+            x="40" y="60"
+            width="370" height="330"
+            supportedTypes="LONG_TEXT"
+            isCustomizable="FALSE">
+
+            <DefaultProviderPolicy
+                primaryProvider="uk.co.maybeitsadam.literatureclock/uk.co.maybeitsadam.literatureclock.LiteratureQuoteDataSource"
+                primaryProviderType="LONG_TEXT"
+                defaultSystemProvider="EMPTY"
+                defaultSystemProviderType="LONG_TEXT" />
+
+            <BoundingOval x="0" y="0" width="370" height="330" />
+
+            <Complication type="LONG_TEXT">
+                <PartText x="0" y="0" width="370" height="270">
+                    <Text alignment="CENTER">
+                        <Font size="16" color="#FF666666" family="serif" weight="THIN">
+                            [COMPLICATION.TEXT]
+                        </Font>
+                    </Text>
+                </PartText>
+                <PartText x="0" y="275" width="370" height="55">
+                    <Text alignment="CENTER">
+                        <Font size="13" color="#FF444444" family="serif" weight="THIN" slant="ITALIC">
+                            [COMPLICATION.TITLE]
+                        </Font>
+                    </Text>
+                </PartText>
+            </Complication>
+
+        </ComplicationSlot>
+
+    </Scene>
+
+</WatchFace>

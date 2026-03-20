@@ -9,11 +9,10 @@ android {
 
     defaultConfig {
         applicationId = "uk.co.maybeitsadam.literatureclock"
-        minSdk = 30
+        minSdk = 33 // WearOS 4 minimum for Watch Face Format
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
-
     }
 
     buildTypes {
@@ -35,6 +34,8 @@ android {
 }
 
 dependencies {
-
     implementation(libs.play.services.wearable)
+    implementation(libs.watchface.complications.data.source)
+    implementation(libs.watchface.complications.data.source.ktx)
+    implementation(libs.kotlinx.coroutines.android)
 }

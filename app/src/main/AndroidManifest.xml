@@ -3,11 +3,54 @@
 
     <uses-feature android:name="android.hardware.type.watch" />
 
+    <!-- Exact alarms for per-minute complication updates -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <!-- Restart minute-alarm chain after reboot -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
-        android:theme="@android:style/Theme.DeviceDefault" />
+        android:theme="@android:style/Theme.DeviceDefault">
+
+        <!-- WFF watch face declaration -->
+        <property
+            android:name="com.google.wear.watchface.format.version"
+            android:value="1" />
+
+        <!-- Complication data source: provides literary quotes keyed to current minute -->
+        <service
+            android:name=".LiteratureQuoteDataSource"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher"
+            android:label="@string/complication_label"
+            android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
+
+            <intent-filter>
+                <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.support.wearable.complications.SUPPORTED_TYPES"
+                android:value="LONG_TEXT" />
+
+            <!-- 300s fallback; actual per-minute updates driven by MinuteUpdateReceiver -->
+            <meta-data
+                android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
+                android:value="300" />
+        </service>
+
+        <!-- Alarm receiver for per-minute updates + restart on boot -->
+        <receiver
+            android:name=".MinuteUpdateReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+    </application>
 
 </manifest>
