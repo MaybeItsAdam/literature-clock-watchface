@@ -6,55 +6,70 @@ import androidx.wear.watchface.complications.data.ComplicationData
 import androidx.wear.watchface.complications.data.ComplicationType
 import androidx.wear.watchface.complications.data.LongTextComplicationData
 import androidx.wear.watchface.complications.data.PlainComplicationText
+import androidx.wear.watchface.complications.datasource.ComplicationDataSourceService
+import androidx.wear.watchface.complications.datasource.ComplicationDataTimeline
 import androidx.wear.watchface.complications.datasource.ComplicationRequest
-import androidx.wear.watchface.complications.datasource.SuspendingComplicationDataSourceService
+import androidx.wear.watchface.complications.datasource.TimeInterval
+import androidx.wear.watchface.complications.datasource.TimelineEntry
 import org.json.JSONArray
 import java.io.IOException
-import java.text.SimpleDateFormat
-import java.util.Date
+import java.time.Instant
+import java.time.LocalTime
+import java.time.ZoneId
+import java.time.ZonedDateTime
+import java.time.temporal.ChronoUnit
 import java.util.Locale
 
 /**
  * Complication data source that provides literary quotes keyed to the current minute.
  *
- * Reads from assets/quotes.json — each entry has:
- *   time, quote_first, quote_time, quote_last, title, author
- *
- * The full quote is assembled as: quote_first + quote_time + quote_last
- * The attribution line is: "— Author, Title"
+ * Uses ComplicationDataTimeline to batch the next 60 minutes of quotes in a single
+ * response. The system swaps entries automatically — no per-minute wakeups needed.
+ * UPDATE_PERIOD_SECONDS (3600) triggers a refresh once per hour to replenish the timeline.
  */
-class LiteratureQuoteDataSource : SuspendingComplicationDataSourceService() {
+class LiteratureQuoteDataSource : ComplicationDataSourceService() {
 
     companion object {
         private const val TAG = "LitQuoteDataSource"
         private const val PREFS_NAME = "literature_clock_prefs"
         private const val KEY_FILTER_NSFW = "filter_nsfw"
+        private const val KEY_STOP_BEING_ANNOYING = "stop_being_annoying"
+        private const val TIMELINE_MINUTES = 90 // buffer beyond the 60-min update period
         private const val FALLBACK_QUOTE = "Time is the longest distance between two places."
-        private const val FALLBACK_ATTRIBUTION = "— Tennessee Williams, The Glass Menagerie"
     }
 
     /** Lazily loaded and cached map of "HH:mm" → list of QuoteEntries */
     private val quotesMap: Map<String, List<QuoteEntry>> by lazy { loadQuotes() }
 
-    override fun onComplicationActivated(complicationInstanceId: Int, type: ComplicationType) {
-        super.onComplicationActivated(complicationInstanceId, type)
-        MinuteUpdateReceiver.schedule(this)
-    }
+    override fun onComplicationRequest(
+        request: ComplicationRequest,
+        listener: ComplicationRequestListener
+    ) {
+        val now = ZonedDateTime.now()
+        val minuteStart = now.truncatedTo(ChronoUnit.MINUTES)
 
-    override fun onComplicationDeactivated(complicationInstanceId: Int) {
-        super.onComplicationDeactivated(complicationInstanceId)
-        MinuteUpdateReceiver.cancel(this)
-    }
+        // Current minute's quote becomes the default (shown immediately)
+        val currentEntry = findQuote(timeKeyFor(minuteStart.toLocalTime()))
+        val defaultData = buildComplicationData(currentEntry)
 
-    override suspend fun onComplicationRequest(
-        request: ComplicationRequest
-    ): ComplicationData? {
-        // Re-arm the alarm on every request (belt-and-suspenders with the 300s fallback)
-        MinuteUpdateReceiver.schedule(this)
+        // Build timeline entries for the next TIMELINE_MINUTES
+        val timelineEntries = mutableListOf<TimelineEntry>()
+        for (offset in 1..TIMELINE_MINUTES) {
+            val entryStart = minuteStart.plusMinutes(offset.toLong())
+            val entryEnd = entryStart.plusMinutes(1)
+            val quote = findQuote(timeKeyFor(entryStart.toLocalTime()))
 
-        val timeKey = SimpleDateFormat("HH:mm", Locale.US).format(Date())
-        val entry = findQuote(timeKey)
-        return buildComplicationData(entry)
+            timelineEntries.add(
+                TimelineEntry(
+                    validity = TimeInterval(entryStart.toInstant(), entryEnd.toInstant()),
+                    complicationData = buildComplicationData(quote)
+                )
+            )
+        }
+
+        val timeline = ComplicationDataTimeline(defaultData, timelineEntries)
+        Log.d(TAG, "Built timeline: 1 default + ${timelineEntries.size} entries from $minuteStart")
+        listener.onComplicationDataTimeline(timeline)
     }
 
     override fun getPreviewData(type: ComplicationType): ComplicationData {
@@ -87,7 +102,8 @@ class LiteratureQuoteDataSource : SuspendingComplicationDataSourceService() {
                     quoteLast = obj.optString("quote_last", ""),
                     title = obj.optString("title", ""),
                     author = obj.optString("author", ""),
-                    nsfw = obj.optBoolean("nsfw", false)
+                    nsfw = obj.optBoolean("nsfw", false),
+                    easterEgg = obj.optBoolean("easter_egg", false)
                 )
                 map.getOrPut(entry.time) { mutableListOf() }.add(entry)
             }
@@ -99,27 +115,39 @@ class LiteratureQuoteDataSource : SuspendingComplicationDataSourceService() {
         }
     }
 
-    private fun isNsfwFiltered(): Boolean {
-        return getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .getBoolean(KEY_FILTER_NSFW, true) // filtered by default
-    }
+    // ──────────────────────────────────────────────────────────────
+    // Quote selection
+    // ──────────────────────────────────────────────────────────────
+
+    private fun prefs() = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+    private fun isNsfwFiltered(): Boolean =
+        prefs().getBoolean(KEY_FILTER_NSFW, true)
+
+    private fun isStopBeingAnnoying(): Boolean =
+        prefs().getBoolean(KEY_STOP_BEING_ANNOYING, false)
+
+    private fun timeKeyFor(time: LocalTime): String =
+        String.format(Locale.US, "%02d:%02d", time.hour, time.minute)
 
     /**
-     * Look up the exact minute, filter by NSFW preference, and pick a random quote.
-     * If no allowed quotes exist for this minute, rounds down minute-by-minute (max 60).
-     * Falls back to a hardcoded quote.
+     * Look up the exact minute, filter by NSFW / easter-egg preferences,
+     * and pick a random quote. If no allowed quotes exist for this minute,
+     * rounds down minute-by-minute (max 60). Falls back to a hardcoded quote.
      */
     private fun findQuote(timeKey: String): QuoteEntry {
         val filterNsfw = isNsfwFiltered()
+        val filterEasterEggs = isStopBeingAnnoying()
 
         fun candidates(key: String): List<QuoteEntry> {
             val entries = quotesMap[key] ?: return emptyList()
-            return if (filterNsfw) entries.filter { !it.nsfw } else entries
+            return entries.filter { entry ->
+                (!filterNsfw || !entry.nsfw) && (!filterEasterEggs || !entry.easterEgg)
+            }
         }
 
         candidates(timeKey).randomOrNull()?.let { return it }
 
-        // Round down: try earlier minutes within the same hour
         val parts = timeKey.split(":")
         val hour = parts[0].toIntOrNull() ?: return fallbackEntry()
         val minute = parts[1].toIntOrNull() ?: return fallbackEntry()
@@ -174,6 +202,7 @@ class LiteratureQuoteDataSource : SuspendingComplicationDataSourceService() {
         val quoteLast: String,
         val title: String,
         val author: String,
-        val nsfw: Boolean = false
+        val nsfw: Boolean = false,
+        val easterEgg: Boolean = false
     )
 }
