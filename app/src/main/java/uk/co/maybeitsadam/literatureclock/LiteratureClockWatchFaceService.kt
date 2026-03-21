@@ -3,13 +3,14 @@ package uk.co.maybeitsadam.literatureclock
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.Typeface
 import android.text.SpannableStringBuilder
 import android.text.Spanned
 import android.text.StaticLayout
 import android.text.TextPaint
-import android.text.style.StyleSpan
+import android.text.style.MetricAffectingSpan
 import android.util.JsonReader
 import android.util.Log
 import android.view.SurfaceHolder
@@ -108,44 +109,53 @@ object QuoteRepository {
         return try {
             val map = mutableMapOf<String, List<QuoteEntry>>()
             var total = 0
-            val reader = JsonReader(InputStreamReader(context.assets.open("quotes.json")))
-            reader.beginObject()
-            while (reader.hasNext()) {
-                val timeKey = reader.nextName()
-                val list = mutableListOf<QuoteEntry>()
-                reader.beginArray()
+            JsonReader(InputStreamReader(context.assets.open("quotes.json"))).use { reader ->
+                reader.beginObject()
                 while (reader.hasNext()) {
-                    var qf = ""; var qt = ""; var ql = ""
-                    var ti = ""; var au = ""
-                    var nsfw = false; var egg = false
-                    reader.beginObject()
+                    val timeKey = reader.nextName()
+                    val list = mutableListOf<QuoteEntry>()
+                    reader.beginArray()
                     while (reader.hasNext()) {
-                        when (reader.nextName()) {
-                            "qf" -> qf = reader.nextString()
-                            "qt" -> qt = reader.nextString()
-                            "ql" -> ql = reader.nextString()
-                            "ti" -> ti = reader.nextString()
-                            "au" -> au = reader.nextString()
-                            "n" -> nsfw = reader.nextBoolean()
-                            "e" -> egg = reader.nextBoolean()
-                            else -> reader.skipValue()
+                        var qf = ""; var qt = ""; var ql = ""
+                        var ti = ""; var au = ""
+                        var nsfw = false; var egg = false
+                        reader.beginObject()
+                        while (reader.hasNext()) {
+                            when (reader.nextName()) {
+                                "qf" -> qf = reader.nextString()
+                                "qt" -> qt = reader.nextString()
+                                "ql" -> ql = reader.nextString()
+                                "ti" -> ti = reader.nextString()
+                                "au" -> au = reader.nextString()
+                                "n" -> nsfw = reader.nextBoolean()
+                                "e" -> egg = reader.nextBoolean()
+                                else -> reader.skipValue()
+                            }
                         }
+                        reader.endObject()
+                        list.add(QuoteEntry(timeKey, qf, qt, ql, ti, au, nsfw, egg))
+                        total++
                     }
-                    reader.endObject()
-                    list.add(QuoteEntry(timeKey, qf, qt, ql, ti, au, nsfw, egg))
-                    total++
+                    reader.endArray()
+                    map[timeKey] = list
                 }
-                reader.endArray()
-                map[timeKey] = list
+                reader.endObject()
             }
-            reader.endObject()
-            reader.close()
             Log.d(TAG, "Loaded $total quotes across ${map.size} minutes")
             map
         } catch (e: IOException) {
             Log.e(TAG, "Failed to load quotes.json", e)
             emptyMap()
         }
+    }
+}
+
+private class CustomTypefaceSpan(private val typeface: Typeface) : MetricAffectingSpan() {
+    override fun updateDrawState(paint: TextPaint) {
+        paint.typeface = typeface
+    }
+    override fun updateMeasureState(paint: TextPaint) {
+        paint.typeface = typeface
     }
 }
 
@@ -163,6 +173,7 @@ internal class LiteratureClockRenderer(
     interactiveDrawModeUpdateDelayMillis = 60_000L
 ) {
     private val tfRegular: Typeface = loadFont(R.font.merriweather_regular)
+    private val tfBold: Typeface = loadFont(R.font.merriweather_bold)
     private val tfItalic: Typeface = loadFont(R.font.merriweather_italic)
 
     private val lightBg = Color.parseColor("#F2F0E6")
@@ -210,7 +221,6 @@ internal class LiteratureClockRenderer(
             zonedDateTime.hour, zonedDateTime.minute
         )
 
-        // Invalidate cache if filters changed
         if (filterNsfw != lastFilterNsfw || hideEasterEggs != lastHideEasterEggs) {
             lastMinute = ""
             cachedQuote = null
@@ -241,7 +251,7 @@ internal class LiteratureClockRenderer(
             val boldEnd = length
             if (boldStart < boldEnd) {
                 setSpan(
-                    StyleSpan(Typeface.BOLD),
+                    CustomTypefaceSpan(tfBold),
                     boldStart, boldEnd,
                     Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
                 )
@@ -254,7 +264,6 @@ internal class LiteratureClockRenderer(
 
         quotePaint.textSize = (bounds.width() * 0.042f)
         quotePaint.color = textColor
-        quotePaint.typeface = tfRegular
         val quoteLayout = StaticLayout.Builder
             .obtain(quoteSpannable, 0, quoteSpannable.length, quotePaint, textWidth)
             .setLineSpacing(4f, 1.15f)

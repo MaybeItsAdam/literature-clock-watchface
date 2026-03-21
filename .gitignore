@@ -9,5 +9,6 @@ local.properties
 .externalNativeBuild
 .cxx
 .claude
+.kotlin
 *.keystore
 *.jks

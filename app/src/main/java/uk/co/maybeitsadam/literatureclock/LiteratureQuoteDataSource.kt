@@ -72,8 +72,13 @@ class LiteratureQuoteDataSource : ComplicationDataSourceService() {
         String.format(Locale.US, "%02d:%02d", time.hour, time.minute)
 
     private fun findQuote(timeKey: String): QuoteEntry {
-        fun candidates(key: String): List<QuoteEntry> =
-            quotesMap[key] ?: emptyList()
+        val filterNsfw = getSharedPreferences("literature_clock_prefs", MODE_PRIVATE)
+            .getBoolean("filter_nsfw", true)
+
+        fun candidates(key: String): List<QuoteEntry> {
+            val entries = quotesMap[key] ?: return emptyList()
+            return if (filterNsfw) entries.filter { !it.nsfw && !it.easterEgg } else entries
+        }
 
         candidates(timeKey).randomOrNull()?.let { return it }
 
