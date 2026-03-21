@@ -10,26 +10,43 @@
         android:supportsRtl="true"
         android:theme="@android:style/Theme.DeviceDefault">
 
-        <!-- WFF watch face: system reads res/raw/watchface.xml -->
-        <property
-            android:name="com.google.wear.watchface.format.version"
-            android:value="2" />
-
+        <!-- Light watch face -->
         <service
-            android:name=".LiteratureClockWatchFaceService"
+            android:name=".LiteratureClockLightWatchFaceService"
             android:exported="true"
-            android:label="@string/app_name"
+            android:label="@string/watch_face_light_name"
             android:permission="android.permission.BIND_WALLPAPER">
             <intent-filter>
                 <action android:name="android.service.wallpaper.WallpaperService" />
                 <category android:name="com.google.android.wearable.watchface.category.WATCH_FACE" />
             </intent-filter>
             <meta-data
-                android:name="com.google.android.wearable.watchface.wffVersion"
-                android:value="2" />
+                android:name="android.service.wallpaper"
+                android:resource="@xml/watch_face_info" />
+            <meta-data
+                android:name="com.google.android.wearable.watchface.preview"
+                android:resource="@drawable/watchface_preview_light" />
         </service>
 
-        <!-- Complication data source: provides literary quotes keyed to current minute -->
+        <!-- Dark watch face -->
+        <service
+            android:name=".LiteratureClockDarkWatchFaceService"
+            android:exported="true"
+            android:label="@string/watch_face_dark_name"
+            android:permission="android.permission.BIND_WALLPAPER">
+            <intent-filter>
+                <action android:name="android.service.wallpaper.WallpaperService" />
+                <category android:name="com.google.android.wearable.watchface.category.WATCH_FACE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.wallpaper"
+                android:resource="@xml/watch_face_info" />
+            <meta-data
+                android:name="com.google.android.wearable.watchface.preview"
+                android:resource="@drawable/watchface_preview_dark" />
+        </service>
+
+        <!-- Complication data source (for other watch faces) -->
         <service
             android:name=".LiteratureQuoteDataSource"
             android:exported="true"
@@ -45,7 +62,6 @@
                 android:name="android.support.wearable.complications.SUPPORTED_TYPES"
                 android:value="LONG_TEXT" />
 
-            <!-- Timeline covers 90 min; refresh hourly to replenish -->
             <meta-data
                 android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
                 android:value="3600" />

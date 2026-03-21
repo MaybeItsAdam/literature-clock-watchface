@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Placeholder preview: off-white circle with centered text -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
         <shape android:shape="oval">
-            <solid android:color="#FFF2F0E6" />
+            <solid android:color="#FF181A1B" />
             <size android:width="450dp" android:height="450dp" />
         </shape>
     </item>
