@@ -1,6 +1,10 @@
 <resources>
     <string name="app_name">Literature Clock</string>
-    <string name="watch_face_light_name">Literature Clock</string>
-    <string name="watch_face_dark_name">Literature Clock Dark</string>
     <string name="complication_label">Literature Quote</string>
+    <string name="style_dark_mode">Dark Mode</string>
+    <string name="style_dark_mode_desc">Dark background with light text</string>
+    <string name="style_filter_nsfw">Filter NSFW</string>
+    <string name="style_filter_nsfw_desc">Hide quotes with mature content</string>
+    <string name="style_hide_easter_eggs">Hide Easter Eggs</string>
+    <string name="style_hide_easter_eggs_desc">Hide custom easter egg quotes</string>
 </resources>

@@ -1,6 +1,5 @@
 package uk.co.maybeitsadam.literatureclock
 
-import android.content.Context
 import android.util.Log
 import androidx.wear.watchface.complications.data.ComplicationData
 import androidx.wear.watchface.complications.data.ComplicationType
@@ -20,9 +19,6 @@ class LiteratureQuoteDataSource : ComplicationDataSourceService() {
 
     companion object {
         private const val TAG = "LitQuoteDataSource"
-        private const val PREFS_NAME = "literature_clock_prefs"
-        private const val KEY_FILTER_NSFW = "filter_nsfw"
-        private const val KEY_STOP_BEING_ANNOYING = "stop_being_annoying"
         private const val TIMELINE_MINUTES = 90
         private const val FALLBACK_QUOTE = "Time is the longest distance between two places."
     }
@@ -72,21 +68,12 @@ class LiteratureQuoteDataSource : ComplicationDataSourceService() {
         return buildComplicationData(preview)
     }
 
-    private fun prefs() = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-
     private fun timeKeyFor(time: LocalTime): String =
         String.format(Locale.US, "%02d:%02d", time.hour, time.minute)
 
     private fun findQuote(timeKey: String): QuoteEntry {
-        val filterNsfw = prefs().getBoolean(KEY_FILTER_NSFW, true)
-        val filterEasterEggs = prefs().getBoolean(KEY_STOP_BEING_ANNOYING, false)
-
-        fun candidates(key: String): List<QuoteEntry> {
-            val entries = quotesMap[key] ?: return emptyList()
-            return entries.filter { entry ->
-                (!filterNsfw || !entry.nsfw) && (!filterEasterEggs || !entry.easterEgg)
-            }
-        }
+        fun candidates(key: String): List<QuoteEntry> =
+            quotesMap[key] ?: emptyList()
 
         candidates(timeKey).randomOrNull()?.let { return it }
 

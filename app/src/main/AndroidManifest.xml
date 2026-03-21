@@ -10,11 +10,11 @@
         android:supportsRtl="true"
         android:theme="@android:style/Theme.DeviceDefault">
 
-        <!-- Light watch face -->
+        <!-- Watch face service -->
         <service
-            android:name=".LiteratureClockLightWatchFaceService"
+            android:name=".LiteratureClockWatchFaceService"
             android:exported="true"
-            android:label="@string/watch_face_light_name"
+            android:label="@string/app_name"
             android:permission="android.permission.BIND_WALLPAPER">
             <intent-filter>
                 <action android:name="android.service.wallpaper.WallpaperService" />
@@ -26,24 +26,6 @@
             <meta-data
                 android:name="com.google.android.wearable.watchface.preview"
                 android:resource="@drawable/watchface_preview_light" />
-        </service>
-
-        <!-- Dark watch face -->
-        <service
-            android:name=".LiteratureClockDarkWatchFaceService"
-            android:exported="true"
-            android:label="@string/watch_face_dark_name"
-            android:permission="android.permission.BIND_WALLPAPER">
-            <intent-filter>
-                <action android:name="android.service.wallpaper.WallpaperService" />
-                <category android:name="com.google.android.wearable.watchface.category.WATCH_FACE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.service.wallpaper"
-                android:resource="@xml/watch_face_info" />
-            <meta-data
-                android:name="com.google.android.wearable.watchface.preview"
-                android:resource="@drawable/watchface_preview_dark" />
         </service>
 
         <!-- Complication data source (for other watch faces) -->

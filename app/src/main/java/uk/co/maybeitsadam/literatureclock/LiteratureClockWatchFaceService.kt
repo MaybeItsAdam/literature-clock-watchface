@@ -23,34 +23,63 @@ import androidx.wear.watchface.WatchFaceService
 import androidx.wear.watchface.WatchFaceType
 import androidx.wear.watchface.WatchState
 import androidx.wear.watchface.style.CurrentUserStyleRepository
+import androidx.wear.watchface.style.UserStyleSchema
+import androidx.wear.watchface.style.UserStyleSetting
+import androidx.wear.watchface.style.UserStyleSetting.BooleanUserStyleSetting
 import java.io.IOException
 import java.io.InputStreamReader
 import java.time.ZonedDateTime
 import java.util.Locale
 
-class LiteratureClockLightWatchFaceService : WatchFaceService() {
-    override suspend fun createWatchFace(
-        surfaceHolder: SurfaceHolder,
-        watchState: WatchState,
-        complicationSlotsManager: ComplicationSlotsManager,
-        currentUserStyleRepository: CurrentUserStyleRepository
-    ): WatchFace {
-        val quotes = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            QuoteRepository.loadQuotesFromAssets(applicationContext)
-        }
-        val renderer = LiteratureClockRenderer(
-            context = this,
-            surfaceHolder = surfaceHolder,
-            watchState = watchState,
-            currentUserStyleRepository = currentUserStyleRepository,
-            quotesMap = quotes,
-            darkMode = false
-        )
-        return WatchFace(WatchFaceType.DIGITAL, renderer)
-    }
-}
+class LiteratureClockWatchFaceService : WatchFaceService() {
 
-class LiteratureClockDarkWatchFaceService : WatchFaceService() {
+    companion object {
+        internal val STYLE_DARK_MODE = UserStyleSetting.Id("dark_mode")
+        internal val STYLE_FILTER_NSFW = UserStyleSetting.Id("filter_nsfw")
+        internal val STYLE_HIDE_EASTER_EGGS = UserStyleSetting.Id("hide_easter_eggs")
+    }
+
+    override fun createUserStyleSchema(): UserStyleSchema {
+        return UserStyleSchema(
+            listOf(
+                BooleanUserStyleSetting(
+                    id = STYLE_DARK_MODE,
+                    resources = resources,
+                    displayNameResourceId = R.string.style_dark_mode,
+                    descriptionResourceId = R.string.style_dark_mode_desc,
+                    icon = null,
+                    affectsWatchFaceLayers = listOf(
+                        androidx.wear.watchface.style.WatchFaceLayer.BASE,
+                        androidx.wear.watchface.style.WatchFaceLayer.COMPLICATIONS_OVERLAY
+                    ),
+                    defaultValue = false
+                ),
+                BooleanUserStyleSetting(
+                    id = STYLE_FILTER_NSFW,
+                    resources = resources,
+                    displayNameResourceId = R.string.style_filter_nsfw,
+                    descriptionResourceId = R.string.style_filter_nsfw_desc,
+                    icon = null,
+                    affectsWatchFaceLayers = listOf(
+                        androidx.wear.watchface.style.WatchFaceLayer.BASE
+                    ),
+                    defaultValue = true
+                ),
+                BooleanUserStyleSetting(
+                    id = STYLE_HIDE_EASTER_EGGS,
+                    resources = resources,
+                    displayNameResourceId = R.string.style_hide_easter_eggs,
+                    descriptionResourceId = R.string.style_hide_easter_eggs_desc,
+                    icon = null,
+                    affectsWatchFaceLayers = listOf(
+                        androidx.wear.watchface.style.WatchFaceLayer.BASE
+                    ),
+                    defaultValue = false
+                )
+            )
+        )
+    }
+
     override suspend fun createWatchFace(
         surfaceHolder: SurfaceHolder,
         watchState: WatchState,
@@ -60,13 +89,13 @@ class LiteratureClockDarkWatchFaceService : WatchFaceService() {
         val quotes = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             QuoteRepository.loadQuotesFromAssets(applicationContext)
         }
+
         val renderer = LiteratureClockRenderer(
             context = this,
             surfaceHolder = surfaceHolder,
             watchState = watchState,
             currentUserStyleRepository = currentUserStyleRepository,
-            quotesMap = quotes,
-            darkMode = true
+            quotesMap = quotes
         )
         return WatchFace(WatchFaceType.DIGITAL, renderer)
     }
@@ -124,9 +153,8 @@ internal class LiteratureClockRenderer(
     private val context: Context,
     surfaceHolder: SurfaceHolder,
     watchState: WatchState,
-    currentUserStyleRepository: CurrentUserStyleRepository,
-    private val quotesMap: Map<String, List<QuoteEntry>>,
-    private val darkMode: Boolean
+    private val currentUserStyleRepository: CurrentUserStyleRepository,
+    private val quotesMap: Map<String, List<QuoteEntry>>
 ) : Renderer.CanvasRenderer(
     surfaceHolder = surfaceHolder,
     currentUserStyleRepository = currentUserStyleRepository,
@@ -153,21 +181,22 @@ internal class LiteratureClockRenderer(
 
     private var lastMinute = ""
     private var cachedQuote: QuoteEntry? = null
-
-    private companion object {
-        private const val PREFS_NAME = "literature_clock_prefs"
-        private const val KEY_FILTER_NSFW = "filter_nsfw"
-        private const val KEY_STOP_BEING_ANNOYING = "stop_being_annoying"
-    }
+    private var lastFilterNsfw = true
+    private var lastHideEasterEggs = false
 
     private fun loadFont(resId: Int): Typeface =
         ResourcesCompat.getFont(context, resId) ?: Typeface.SERIF
 
-    private fun prefs() =
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    private fun getBoolStyle(id: UserStyleSetting.Id): Boolean {
+        val option = currentUserStyleRepository.userStyle.value[id]
+        return (option as? BooleanUserStyleSetting.BooleanOption)?.value ?: false
+    }
 
     override fun render(canvas: Canvas, bounds: Rect, zonedDateTime: ZonedDateTime) {
         val isAmbient = renderParameters.drawMode == DrawMode.AMBIENT
+        val darkMode = getBoolStyle(LiteratureClockWatchFaceService.STYLE_DARK_MODE)
+        val filterNsfw = getBoolStyle(LiteratureClockWatchFaceService.STYLE_FILTER_NSFW)
+        val hideEasterEggs = getBoolStyle(LiteratureClockWatchFaceService.STYLE_HIDE_EASTER_EGGS)
 
         val bgColor = when {
             isAmbient -> Color.BLACK
@@ -180,7 +209,16 @@ internal class LiteratureClockRenderer(
             Locale.US, "%02d:%02d",
             zonedDateTime.hour, zonedDateTime.minute
         )
-        val entry = getQuoteForMinute(timeKey)
+
+        // Invalidate cache if filters changed
+        if (filterNsfw != lastFilterNsfw || hideEasterEggs != lastHideEasterEggs) {
+            lastMinute = ""
+            cachedQuote = null
+            lastFilterNsfw = filterNsfw
+            lastHideEasterEggs = hideEasterEggs
+        }
+
+        val entry = getQuoteForMinute(timeKey, filterNsfw, hideEasterEggs)
 
         val textColor = when {
             isAmbient -> ambientText
@@ -252,18 +290,19 @@ internal class LiteratureClockRenderer(
         // No highlight layer needed
     }
 
-    private fun getQuoteForMinute(timeKey: String): QuoteEntry {
+    private fun getQuoteForMinute(
+        timeKey: String,
+        filterNsfw: Boolean,
+        hideEasterEggs: Boolean
+    ): QuoteEntry {
         if (timeKey == lastMinute && cachedQuote != null) {
             return cachedQuote!!
         }
 
-        val filterNsfw = prefs().getBoolean(KEY_FILTER_NSFW, true)
-        val filterEasterEggs = prefs().getBoolean(KEY_STOP_BEING_ANNOYING, false)
-
         fun candidates(key: String): List<QuoteEntry> {
             val entries = quotesMap[key] ?: return emptyList()
             return entries.filter { entry ->
-                (!filterNsfw || !entry.nsfw) && (!filterEasterEggs || !entry.easterEgg)
+                (!filterNsfw || !entry.nsfw) && (!hideEasterEggs || !entry.easterEgg)
             }
         }
 
