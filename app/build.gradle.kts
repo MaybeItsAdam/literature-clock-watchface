@@ -11,8 +11,8 @@ android {
         applicationId = "uk.co.maybeitsadam.literatureclock"
         minSdk = 33
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
     }
 
     signingConfigs {
@@ -50,6 +50,7 @@ android {
 dependencies {
     implementation(libs.play.services.wearable)
     implementation(libs.watchface)
+    implementation(libs.watchface.editor)
     implementation(libs.watchface.complications.data.source)
     implementation(libs.watchface.complications.data.source.ktx)
     implementation(libs.kotlinx.coroutines.android)

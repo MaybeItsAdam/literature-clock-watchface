@@ -10,6 +10,7 @@ play-services-wearable = { group = "com.google.android.gms", name = "play-servic
 watchface = { group = "androidx.wear.watchface", name = "watchface", version.ref = "watchfaceComplicationsDataSource" }
 watchface-complications-data-source = { group = "androidx.wear.watchface", name = "watchface-complications-data-source", version.ref = "watchfaceComplicationsDataSource" }
 watchface-complications-data-source-ktx = { group = "androidx.wear.watchface", name = "watchface-complications-data-source-ktx", version.ref = "watchfaceComplicationsDataSource" }
+watchface-editor = { group = "androidx.wear.watchface", name = "watchface-editor", version.ref = "watchfaceComplicationsDataSource" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
 
 [plugins]
